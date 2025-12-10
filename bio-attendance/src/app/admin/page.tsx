@@ -1,8 +1,4 @@
 "use client"
-import { ChartAreaInteractive } from "@/adminComponents/chart-area-interactive"
-import PieChart  from "@/adminComponents/pie-chart"
-import DataTable  from "@/adminComponents/data-table"
-import { SiteHeader } from "../../adminComponents/site-header"
 import { SidebarInset,  } from "../../adminComponents/ui/sidebar"
 import { useLecturerSession } from "@/hooks/useLecturerSession"
 import useGetLecturer from "@/hooks/useGetLecturer"

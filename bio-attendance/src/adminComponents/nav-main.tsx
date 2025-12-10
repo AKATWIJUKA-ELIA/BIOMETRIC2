@@ -3,8 +3,7 @@
 import {
         // Rocket,
          type LucideIcon } from "lucide-react"
-import { IoBagCheckOutline  } from "react-icons/io5";
-import {HomeIcon,SquarePlus,Rows4,Edit2Icon,PlusCircleIcon,UserCircle,
+import {HomeIcon,SquarePlus,Edit2Icon,UserCircle,
         // Users,HandCoins,SquareStack,Newspaper,User
 } from "lucide-react"
 import {
@@ -15,16 +14,10 @@ import {
   SidebarMenuItem,
 } from "@/adminComponents/ui/sidebar"
 import Link from "next/link";
-import { MdOutlinePending } from "react-icons/md";
 import { FcApproval } from "react-icons/fc";
-import { Id } from "../../convex/_generated/dataModel";
-import { useLecturerSession } from "@/hooks/useLecturerSession"
-import useGetLecturer from "@/hooks/useGetLecturer"
 
 
 export function NavMain() {
-        const {session} = useLecturerSession();
-        const User = useGetLecturer(session?.userId as Id<"lecturers">);
         const items = [
                 {
                         title: "Home & Sessions",

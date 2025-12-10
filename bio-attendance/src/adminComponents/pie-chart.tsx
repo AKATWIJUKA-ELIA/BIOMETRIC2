@@ -1,5 +1,4 @@
 import { Cell, Pie, PieChart, Tooltip, ResponsiveContainer } from "recharts";
-import React from 'react';
 interface Approved{
         orders:number,
         products:number
