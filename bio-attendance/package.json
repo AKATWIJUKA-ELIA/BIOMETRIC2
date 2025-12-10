@@ -31,7 +31,7 @@
     "face-api.js": "^0.22.2",
     "jose": "^6.1.2",
     "lucide-react": "^0.555.0",
-    "next": "16.0.5",
+    "next": "^16.0.8",
     "node-mailer": "^0.1.1",
     "nodemailer": "^7.0.11",
     "react": "19.2.0",
