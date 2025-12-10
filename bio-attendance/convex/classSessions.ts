@@ -1,0 +1,300 @@
+import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+
+export const create = mutation({
+  args: {
+        lecturerId: v.optional(v.id("lecturers")),
+        sessionTitle: v.string(),
+        description: v.optional(v.string()),
+        courseUnitCode: v.string(),
+        startsAt: v.number(),
+        endsAt: v.number(),
+        status: v.union(
+          v.literal("scheduled"),
+          v.literal("live"),
+          v.literal("closed"),
+        ),
+        location: v.string(),
+        autoClose: v.optional(v.boolean()),
+        autoStart: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (args.endsAt <= args.startsAt) {
+      throw new ConvexError("Session end must be after start");
+    }
+    // Generate session ID in format: SES-XXXXXXXXXX
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const randomPart = Array.from({ length: 10 }, () =>
+      chars.charAt(Math.floor(Math.random() * chars.length))
+    ).join("");
+    const sessionId = `SES-${randomPart}`;
+
+    const result = await ctx.db.insert("attendance_sessions", {
+      sessionId: sessionId,
+      lecturerId: args.lecturerId,
+      sessionTitle: args.sessionTitle,
+      description: args.description,
+      courseUnitCode: args.courseUnitCode,
+      startsAt: args.startsAt,
+      endsAt: args.endsAt,
+      location: args.location,
+      autoClose: args.autoClose,
+        autoStart: args.autoStart,
+      status: "scheduled",
+    });
+    return {
+        success: true,
+        message: "Session created successfully",
+        status: 201,
+        session: result
+};
+  },
+});
+
+export const setStatus = mutation({
+  args: {
+    sessionId: v.id("attendance_sessions"),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("live"),
+      v.literal("closed"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+        return {
+            success: false,
+            message: "Session not found",
+            status: 404
+        }
+    }
+
+    const res = await ctx.db.patch(session._id, {
+      status: args.status,
+      startsAt:args.status === "live" && session.startsAt > Date.now()
+          ? Date.now()
+          : session.startsAt,
+      endsAt:
+        args.status === "closed" && session.endsAt < Date.now()
+          ? Date.now()
+          : session.endsAt,
+    });
+    return {
+        success: true,
+        message: "Session status updated successfully",
+        status: 200,
+        session: res}
+  },
+});
+
+export const liveByClass = query({
+  args: { sessionId: v.id("attendance_sessions") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("attendance_sessions")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .filter((q) => q.eq(q.field("status"), "live"))
+      .first();
+  },
+});
+
+// Get the current live session for a lecturer
+export const getLiveSessionByLecturer = query({
+  args: { lecturerId: v.id("lecturers") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("attendance_sessions")
+      .withIndex("by_lecturer", (q) => q.eq("lecturerId", args.lecturerId))
+      .filter((q) => q.eq(q.field("status"), "live"))
+      .first();
+  },
+});
+
+// Get all live sessions (for attendance module without lecturer context)
+export const getAllLiveSessions = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("attendance_sessions")
+      .filter((q) => q.eq(q.field("status"), "live"))
+      .collect();
+  },
+});
+
+export const listByClass = query({
+  args: { sessionId: v.id("attendance_sessions") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("attendance_sessions")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const ensureLiveSession = mutation({
+  args: {
+    sessionId: v.id("attendance_sessions"),
+    durationMinutes: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("attendance_sessions")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .filter((q) => q.eq(q.field("status"), "live"))
+      .first();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    const now = Date.now();
+    const durationMs = (args.durationMinutes ?? 60) * 60 * 1000;
+    return await ctx.db.insert("attendance_sessions", {
+            sessionId: args.sessionId,
+            startsAt: now,
+            endsAt: now + durationMs,
+            status: "live",
+            autoClose: true,
+            location: "",
+            description: "",
+            courseUnitCode: "",
+            sessionTitle: ""
+    });
+  },
+});
+
+export const getCourseUnits = query({
+        args:{},
+        handler: async (ctx) => {
+                const course_units = await ctx.db.query("course_units").collect();
+                return course_units;
+        } 
+});
+
+export const getSessions = query({
+        args:{},
+        handler: async (ctx) => {
+                const sessions = await ctx.db.query("attendance_sessions").collect();
+                return sessions;
+        }
+});
+
+export const getSessionById = query({
+        args: {sessionId: v.id("attendance_sessions")},
+        handler: async (ctx, args) => {
+                const session = await ctx.db.get(args.sessionId);
+                return session;
+        }
+});
+
+export const getSessionsByLecturer = query({
+        args: {lecturerId: v.id("lecturers")},
+        handler: async (ctx, args) => {
+                const sessions = await ctx.db
+        .query("attendance_sessions")
+        .withIndex("by_lecturer", (q) => q.eq("lecturerId", args.lecturerId))
+        .order("desc")
+        .collect();
+                return sessions;
+        }
+});
+
+export const updateSession = mutation({
+        args: {
+                sessionId: v.id("attendance_sessions"),
+                courseUnitCode: v.optional(v.string()),
+                sessionTitle: v.optional(v.string()),
+                description: v.optional(v.string()),
+                startsAt: v.optional(v.number()),
+                endsAt: v.optional(v.number()),
+                location: v.optional(v.string()),
+                autoClose: v.optional(v.boolean()),
+                autoStart: v.optional(v.boolean()),
+        },
+        handler: async (ctx, args) => {
+                const session = await ctx.db.get(args.sessionId);
+                if (!session) {
+                        return {
+                                success: false,
+                                message: "Session not found",
+                                status: 404
+                        };
+                }
+
+                // Only allow editing scheduled sessions
+                if (session.status !== "scheduled") {
+                        return {
+                                success: false,
+                                message: "Cannot edit a session that is live or closed",
+                                status: 400
+                        };
+                }
+
+                // Validate end time is after start time if both are provided
+                const newStartsAt = args.startsAt ?? session.startsAt;
+                const newEndsAt = args.endsAt ?? session.endsAt;
+                if (newEndsAt <= newStartsAt) {
+                        return {
+                                success: false,
+                                message: "Session end must be after start",
+                                status: 400
+                        };
+                }
+
+                const updates: Partial<typeof session> = {};
+                if (args.courseUnitCode !== undefined) updates.courseUnitCode = args.courseUnitCode;
+                if (args.sessionTitle !== undefined) updates.sessionTitle = args.sessionTitle;
+                if (args.description !== undefined) updates.description = args.description;
+                if (args.startsAt !== undefined) updates.startsAt = args.startsAt;
+                if (args.endsAt !== undefined) updates.endsAt = args.endsAt;
+                if (args.location !== undefined) updates.location = args.location;
+                if (args.autoClose !== undefined) updates.autoClose = args.autoClose;
+                if (args.autoStart !== undefined) updates.autoStart = args.autoStart;
+
+                await ctx.db.patch(args.sessionId, updates);
+
+                return {
+                        success: true,
+                        message: "Session updated successfully",
+                        status: 200
+                };
+        }
+});
+
+export const deleteSession = mutation({
+        args: {
+                sessionId: v.id("attendance_sessions"),
+        },
+        handler: async (ctx, args) => {
+                const session = await ctx.db.get(args.sessionId);
+                if (!session) {
+                        return {
+                                success: false,
+                                message: "Session not found",
+                                status: 404
+                        };
+                }
+
+                // Delete associated attendance records first
+                const attendanceRecords = await ctx.db
+                        .query("attendance_records")
+                        .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+                        .collect();
+
+                for (const record of attendanceRecords) {
+                        await ctx.db.delete(record._id);
+                }
+
+                // Delete the session
+                await ctx.db.delete(args.sessionId);
+
+                return {
+                        success: true,
+                        message: "Session deleted successfully",
+                        status: 200
+                };
+        }
+});
