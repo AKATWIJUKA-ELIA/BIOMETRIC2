@@ -5,18 +5,9 @@ import { CourseStudentsView } from "./components/course-students-view"
 import useGetStudentsPerLecturer from "@/hooks/useGetStudentsPerLecturer"
 import { useLecturerSession } from "@/hooks/useLecturerSession"
 import { Id } from "@/convex/_generated/dataModel"
-import { AttendanceRecord, Student } from "@/lib/types";
+import { AttendanceRecord, Student, CourseUnit } from "@/lib/types";
 import useGetCourseUnitByLecture from "@/hooks/useGetCourseUnitByLecture";
 import Loader from "@/components/Loader/loader"
-// Types
-export interface CourseUnit {
-  id: string
-  code: string
-  name: string
-  semester: string
-  creditUnits: number
-  enrolledStudents: string[] // student IDs
-}
 
 export interface StudentDetail {
   id: string
